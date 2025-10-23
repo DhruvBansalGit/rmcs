@@ -17,9 +17,9 @@ export default function ShuffleAnimation({ onComplete, roundNumber }: ShuffleAni
 
   useEffect(() => {
     // Initialize audio elements
-    shuffleAudioRef.current = new Audio('/sound/shufflecards.mp3');
-    pickupAudioRef.current = new Audio('/sound/cardflip.mp3');
-    throwAudioRef.current = new Audio('/sound/cardflip.mp3');
+    shuffleAudioRef.current = new Audio('/sound/shufflecards.wav');
+    pickupAudioRef.current = new Audio('/sound/cardflip.wav');
+    throwAudioRef.current = new Audio('/sound/cardflip.wav');
 
     // Set volumes (0.0 to 1.0)
     if (shuffleAudioRef.current) shuffleAudioRef.current.volume = 0.6;
