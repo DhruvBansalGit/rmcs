@@ -657,7 +657,7 @@ export default function GamePage() {
                             </div>
                         </div>
 
-                        <div className="mb-6">
+                        <div className="mb-6 text-black">
                             <h4 className="text-xl font-bold mb-4">Final Standings</h4>
                             <div className="space-y-3">
                                 {players
