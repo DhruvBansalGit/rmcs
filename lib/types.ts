@@ -33,7 +33,10 @@ export interface GameState {
   };
   createdAt: number;
   createdBy: string;
+  showShuffleAnimation?: boolean; // Add this
+  animationRound?: number; // Add this
 }
+
 
 export const ROLES: Role[] = [
   { name: 'Raja', points: 1000, color: '#FFD700' },

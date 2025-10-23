@@ -116,8 +116,10 @@ export default function GamePage() {
         }
 
         // Show shuffle animation
-        setAnimationRound(1);
-        setShowShuffleAnimation(true);
+       await update(ref(database, `rooms/${roomCode}`), {
+            showShuffleAnimation: true,
+            animationRound: 1
+        });
     };
 
     const handleShuffleComplete = async () => {
@@ -131,8 +133,10 @@ export default function GamePage() {
         const playerIds = validPlayers.map(([id, _]) => id);
         const roles = shuffleRoles();
 
-        const updates: any = {
-            gamePhase: 'revealing'
+       const updates: any = {
+            gamePhase: 'revealing',
+            showShuffleAnimation: false,
+            animationRound: null
         };
 
         playerIds.forEach((id, index) => {
@@ -199,8 +203,10 @@ export default function GamePage() {
         }
 
         // Show shuffle animation for next round
-        setAnimationRound(gameState.currentRound + 1);
-        setShowShuffleAnimation(true);
+       await update(ref(database, `rooms/${roomCode}`), {
+            showShuffleAnimation: true,
+            animationRound: gameState.currentRound + 1
+        });
     };
 
     const handleNextRoundShuffleComplete = async () => {
@@ -217,7 +223,9 @@ export default function GamePage() {
         const updates: any = {
             gamePhase: 'revealing',
             currentRound: gameState.currentRound + 1,
-            mantriSelection: null
+            mantriSelection: null,
+            showShuffleAnimation: false,
+            animationRound: null
         };
 
         playerIds.forEach((id, index) => {
@@ -260,11 +268,11 @@ export default function GamePage() {
     if (!gameState) return null;
 
     // Show shuffle animation
-    if (showShuffleAnimation) {
+    if (gameState.showShuffleAnimation && gameState.animationRound) {
         return (
             <ShuffleAnimation
-                roundNumber={animationRound}
-                onComplete={animationRound === 1 ? handleShuffleComplete : handleNextRoundShuffleComplete}
+                roundNumber={gameState.animationRound}
+                onComplete={gameState.animationRound === 1 ? handleShuffleComplete : handleNextRoundShuffleComplete}
             />
         );
     }
