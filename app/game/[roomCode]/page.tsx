@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { database, ref, onValue, update, set, remove } from '@/lib/firebase';
 import { GameState, Player } from '@/lib/types';
@@ -21,8 +21,10 @@ export default function GamePage() {
     const [selectedChor, setSelectedChor] = useState<string>('');
     const [selectedSipahi, setSelectedSipahi] = useState<string>('');
     const [showRajaSpeech, setShowRajaSpeech] = useState(true);
-    const [showShuffleAnimation, setShowShuffleAnimation] = useState(false);
-    const [animationRound, setAnimationRound] = useState(1);
+    
+    // Track if voice has been played for current round
+    const hasPlayedVoiceRef = useRef(false);
+    const currentRoundRef = useRef(0);
 
     // Initialize player and set up room listener
     useEffect(() => {
@@ -36,11 +38,43 @@ export default function GamePage() {
         const roomRef = ref(database, `rooms/${roomCode}`);
         const unsubscribe = onValue(roomRef, (snapshot) => {
             const data = snapshot.val();
+               if (!data) {
+            console.log('Room does not exist');
+            router.push('/');
+            setLoading(false);
+            return;
+        }
+
+        // Check if current player still exists in room
+        if (!data.players || !data.players[id]) {
+            console.log('Player removed from room');
+            localStorage.removeItem('playerId');
+            localStorage.removeItem('playerName');
+            router.push('/');
+            setLoading(false);
+            return;
+        }
+
+        setGameState(data);
             if (data) {
                 setGameState(data);
 
-                // Auto-reveal Raja and Mantri in revealing phase
+                // Reset voice flag when round changes
+                if (data.currentRound !== currentRoundRef.current) {
+                    hasPlayedVoiceRef.current = false;
+                    currentRoundRef.current = data.currentRound;
+                }
+
+                // Play voice ONCE when entering revealing phase
                 if (data.gamePhase === 'revealing' && data.rajaId && data.mantriId) {
+                    // Play voice only once per round
+                    if (!hasPlayedVoiceRef.current) {
+                        const voiceAudio = new Audio('/sound/deepaudio.mp3');
+                        voiceAudio.volume = 0.9;
+                        voiceAudio.play().catch(err => console.log('Voice play failed:', err));
+                        hasPlayedVoiceRef.current = true;
+                    }
+
                     const revealed = new Set<string>([data.rajaId, data.mantriId]);
                     setRevealedSlips(revealed);
 
@@ -115,17 +149,22 @@ export default function GamePage() {
             return;
         }
 
-        // Show shuffle animation
-       await update(ref(database, `rooms/${roomCode}`), {
+        // Reset voice flag
+        hasPlayedVoiceRef.current = false;
+        currentRoundRef.current = 1;
+
+        // Trigger animation for all players
+        await update(ref(database, `rooms/${roomCode}`), {
             showShuffleAnimation: true,
             animationRound: 1
         });
     };
 
     const handleShuffleComplete = async () => {
-        setShowShuffleAnimation(false);
-
         if (!gameState) return;
+        
+        // Only the creator processes the shuffle completion
+        if (gameState.createdBy !== playerId) return;
 
         const validPlayers = Object.entries(gameState.players || {}).filter(
             ([_, player]) => player != null && player.id && player.name
@@ -133,7 +172,7 @@ export default function GamePage() {
         const playerIds = validPlayers.map(([id, _]) => id);
         const roles = shuffleRoles();
 
-       const updates: any = {
+        const updates: any = {
             gamePhase: 'revealing',
             showShuffleAnimation: false,
             animationRound: null
@@ -202,17 +241,22 @@ export default function GamePage() {
             return;
         }
 
-        // Show shuffle animation for next round
-       await update(ref(database, `rooms/${roomCode}`), {
+        // Reset voice flag for next round
+        hasPlayedVoiceRef.current = false;
+        currentRoundRef.current = gameState.currentRound + 1;
+
+        // Trigger animation for all players
+        await update(ref(database, `rooms/${roomCode}`), {
             showShuffleAnimation: true,
             animationRound: gameState.currentRound + 1
         });
     };
 
     const handleNextRoundShuffleComplete = async () => {
-        setShowShuffleAnimation(false);
-
         if (!gameState) return;
+        
+        // Only the creator processes the shuffle completion
+        if (gameState.createdBy !== playerId) return;
 
         const validPlayers = Object.entries(gameState.players || {}).filter(
             ([_, player]) => player != null && player.id && player.name
@@ -267,7 +311,7 @@ export default function GamePage() {
 
     if (!gameState) return null;
 
-    // Show shuffle animation
+    // Show shuffle animation (synced across all players via Firebase)
     if (gameState.showShuffleAnimation && gameState.animationRound) {
         return (
             <ShuffleAnimation
@@ -285,28 +329,54 @@ export default function GamePage() {
             typeof player.name === 'string' &&
             player.name.trim().length > 0
     );
+    if (players.length === 0) {
+    router.push('/');
+    return null;
+}
+if (!gameState.players || Object.keys(gameState.players).length === 0 || players.length === 0) {
+    console.log('No players in room, redirecting to home');
+    localStorage.removeItem('playerId');
+    localStorage.removeItem('playerName');
+    router.push('/');
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center">
+            <div className="text-2xl font-semibold text-amber-900">Room is empty. Redirecting...</div>
+        </div>
+    );
+}
+const currentPlayer = gameState.players?.[playerId];
+if (!currentPlayer) {
+    console.log('Current player not found in room, redirecting');
+    localStorage.removeItem('playerId');
+    localStorage.removeItem('playerName');
+    router.push('/');
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center">
+            <div className="text-2xl font-semibold text-amber-900">You left the game. Redirecting...</div>
+        </div>
+    );
+}
 
-    const currentPlayer = gameState.players[playerId];
     const isCreator = gameState.createdBy === playerId;
     const isMantri = gameState.mantriId === playerId;
     const isRaja = gameState.rajaId === playerId;
 
-    const shouldRevealCard = (player: Player) => {
-        if (gameState.gamePhase === 'results' || gameState.gamePhase === 'finished') {
-            return true;
-        }
-        if (player.role === 'Raja' || player.role === 'Mantri') {
-            return true;
-        }
-        if (player.id === playerId) {
-            return true;
-        }
-        return false;
-    };
+ const shouldRevealCard = (player: Player) => {
+    if (gameState.gamePhase === 'results' || gameState.gamePhase === 'finished') {
+        return true;
+    }
+    if (player.role === 'Raja' || player.role === 'Mantri') {
+        return true;
+    }
+    if (player.id === playerId) {
+        return true;
+    }
+    return false;
+};
 
-    const winner = players.length > 0 
-        ? players.reduce((max, player) => player.totalPoints > max.totalPoints ? player : max)
-        : null;
+ const winner = players.length > 0 
+    ? players.reduce((max, player) => player.totalPoints > max.totalPoints ? player : max)
+    : null;
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 p-4 md:p-8">
@@ -600,15 +670,15 @@ export default function GamePage() {
                         )}
 
                         {/* Points Table */}
-                        <div className="bg-white rounded-xl shadow-lg p-6 text-black">
+                        <div className="bg-white rounded-xl shadow-lg p-6">
                             <h3 className="text-xl font-bold mb-4 text-amber-900">📊 Points Table</h3>
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
                                         <tr className="border-b-2 border-amber-200">
-                                            <th className="text-left py-3 px-2">Rank</th>
-                                            <th className="text-left py-3 px-2">Player</th>
-                                            <th className="text-right py-3 px-2">Total Points</th>
+                                            <th className="text-left py-3 px-2 text-gray-700">Rank</th>
+                                            <th className="text-left py-3 px-2 text-gray-700">Player</th>
+                                            <th className="text-right py-3 px-2 text-gray-700">Total Points</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -621,16 +691,16 @@ export default function GamePage() {
                                                         player.id === playerId ? 'bg-blue-50 font-semibold' : ''
                                                     }`}
                                                 >
-                                                    <td className="py-3 px-2">
+                                                    <td className="py-3 px-2 text-gray-800">
                                                         {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
                                                     </td>
-                                                    <td className="py-3 px-2">
+                                                    <td className="py-3 px-2 text-gray-800">
                                                         {player.name}
                                                         {player.id === playerId && (
                                                             <span className="ml-2 text-xs text-blue-600">(You)</span>
                                                         )}
                                                     </td>
-                                                    <td className="text-right py-3 px-2 font-bold">{player.totalPoints}</td>
+                                                    <td className="text-right py-3 px-2 font-bold text-gray-800">{player.totalPoints}</td>
                                                 </tr>
                                             ))}
                                     </tbody>
@@ -657,8 +727,8 @@ export default function GamePage() {
                             </div>
                         </div>
 
-                        <div className="mb-6 text-black">
-                            <h4 className="text-xl font-bold mb-4">Final Standings</h4>
+                        <div className="mb-6">
+                            <h4 className="text-xl font-bold mb-4 text-gray-800">Final Standings</h4>
                             <div className="space-y-3">
                                 {players
                                     .sort((a, b) => b.totalPoints - a.totalPoints)
@@ -671,9 +741,9 @@ export default function GamePage() {
                                                 <span className="text-2xl">
                                                     {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
                                                 </span>
-                                                <span className="font-semibold">{player.name}</span>
+                                                <span className="font-semibold text-gray-800">{player.name}</span>
                                             </div>
-                                            <span className="font-bold text-lg">{player.totalPoints} pts</span>
+                                            <span className="font-bold text-lg text-gray-800">{player.totalPoints} pts</span>
                                         </div>
                                     ))}
                             </div>

@@ -10,7 +10,7 @@ interface ShuffleAnimationProps {
 export default function ShuffleAnimation({ onComplete, roundNumber }: ShuffleAnimationProps) {
   const [phase, setPhase] = useState<'intro' | 'shuffle' | 'throw' | 'fade'>('intro');
   
-  // Audio refs
+  // Audio refs (NO voice here - it plays in game page after animation)
   const shuffleAudioRef = useRef<HTMLAudioElement | null>(null);
   const pickupAudioRef = useRef<HTMLAudioElement | null>(null);
   const throwAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -22,9 +22,9 @@ export default function ShuffleAnimation({ onComplete, roundNumber }: ShuffleAni
     throwAudioRef.current = new Audio('/sound/cardflip.wav');
 
     // Set volumes (0.0 to 1.0)
-    if (shuffleAudioRef.current) shuffleAudioRef.current.volume = 0.6;
-    if (pickupAudioRef.current) pickupAudioRef.current.volume = 0.5;
-    if (throwAudioRef.current) throwAudioRef.current.volume = 0.7;
+    if (shuffleAudioRef.current) shuffleAudioRef.current.volume = 0.5;
+    if (pickupAudioRef.current) pickupAudioRef.current.volume = 0.4;
+    if (throwAudioRef.current) throwAudioRef.current.volume = 0.6;
 
     // Intro phase
     const introTimer = setTimeout(() => {
@@ -45,12 +45,12 @@ export default function ShuffleAnimation({ onComplete, roundNumber }: ShuffleAni
       throwAudioRef.current?.play().catch(err => console.log('Audio play failed:', err));
     }, 2500);
 
-    // Fade phase
+    // Fade phase (REDUCED - no voice phase)
     const fadeTimer = setTimeout(() => {
       setPhase('fade');
     }, 3500);
 
-    // Complete
+    // Complete (REDUCED - no voice delay)
     const completeTimer = setTimeout(() => {
       onComplete();
     }, 4000);
@@ -89,11 +89,15 @@ export default function ShuffleAnimation({ onComplete, roundNumber }: ShuffleAni
           <h1 className="text-6xl font-bold mb-2">
             Round {roundNumber}
           </h1>
-          <p className="text-2xl">🎴 Shuffling Cards...</p>
+          <p className="text-2xl">
+            {phase === 'shuffle' || phase === 'intro' ? '🎴 Shuffling Cards...' : ''}
+            {phase === 'throw' ? '🎴 Distributing Cards...' : ''}
+            {phase === 'fade' ? '✨ Get Ready...' : ''}
+          </p>
         </div>
       </div>
 
-      {/* Animated Hand with Better Movement */}
+      {/* Animated Hand */}
       <div 
         className={`absolute transition-all duration-700 ${
           phase === 'intro' ? 'bottom-[-100px] opacity-0' :
@@ -110,7 +114,7 @@ export default function ShuffleAnimation({ onComplete, roundNumber }: ShuffleAni
         </div>
       </div>
 
-      {/* Paper Slips with Complex Animation */}
+      {/* Paper Slips */}
       <div className="relative w-full h-full flex items-center justify-center perspective-1000">
         {[0, 1, 2, 3].map((index) => (
           <div
@@ -139,7 +143,7 @@ export default function ShuffleAnimation({ onComplete, roundNumber }: ShuffleAni
         ))}
       </div>
 
-      {/* Sparkles and Particles */}
+      {/* Sparkles */}
       {(phase === 'throw' || phase === 'fade') && (
         <>
           {Array.from({ length: 30 }).map((_, i) => (
@@ -172,10 +176,10 @@ export default function ShuffleAnimation({ onComplete, roundNumber }: ShuffleAni
         </div>
       </div>
 
-      {/* Sound indicator (optional visual feedback) */}
+      {/* Sound wave indicator during shuffle */}
       {phase === 'shuffle' && (
         <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 flex gap-1">
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2, 3, 4].map((i) => (
             <div
               key={i}
               className="w-1 bg-amber-400 rounded-full animate-pulse"
