@@ -26,8 +26,10 @@ export default function GameChat({ roomCode, playerId, playerName, messages }: G
   const [isOpen, setIsOpen] = useState(false);
   const [showEmojis, setShowEmojis] = useState(false);
   const [showTexts, setShowTexts] = useState(false);
+  const [visibleMessages, setVisibleMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const timeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -48,6 +50,31 @@ export default function GameChat({ roomCode, playerId, playerName, messages }: G
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Auto-hide floating messages after 5 seconds
+  useEffect(() => {
+    const recentMessages = messages.slice(-5);
+    setVisibleMessages(recentMessages);
+
+    // Clear existing timeouts
+    timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+    timeoutsRef.current.clear();
+
+    // Set new timeouts for each message
+    recentMessages.forEach((msg) => {
+      const timeout = setTimeout(() => {
+        setVisibleMessages(prev => prev.filter(m => m.id !== msg.id));
+      }, 5000); // Hide after 5 seconds
+
+      timeoutsRef.current.set(msg.id, timeout);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+      timeoutsRef.current.clear();
+    };
+  }, [messages]);
 
   const sendMessage = async (message: string, type: 'emoji' | 'text') => {
     const newMessage: ChatMessage = {
@@ -70,9 +97,6 @@ export default function GameChat({ roomCode, playerId, playerName, messages }: G
     setShowTexts(false);
   };
 
-  // Get last 5 messages for floating display
-  const recentMessages = messages.slice(-5);
-
   return (
     <>
       {/* Floating Chat Button */}
@@ -90,10 +114,10 @@ export default function GameChat({ roomCode, playerId, playerName, messages }: G
         )}
       </button>
 
-      {/* Floating Recent Messages (when chat closed) */}
-      {!isOpen && recentMessages.length > 0 && (
+      {/* Floating Recent Messages (when chat closed) - Auto-hide after 5 seconds */}
+      {!isOpen && visibleMessages.length > 0 && (
         <div className="fixed bottom-24 right-6 space-y-2 z-30 pointer-events-none">
-          {recentMessages.map((msg) => (
+          {visibleMessages.map((msg) => (
             <div
               key={msg.id}
               className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-2 max-w-xs animate-slide-up"
@@ -139,7 +163,7 @@ export default function GameChat({ roomCode, playerId, playerName, messages }: G
                     className={`max-w-[70%] rounded-lg p-2 ${
                       msg.playerId === playerId
                         ? 'bg-amber-500 text-white'
-                        : 'bg-white border border-gray-200'
+                        : 'bg-white border border-gray-200 text-gray-800'
                     }`}
                   >
                     <div className="text-xs font-semibold mb-1">
@@ -205,7 +229,7 @@ export default function GameChat({ roomCode, playerId, playerName, messages }: G
                   <button
                     key={text}
                     onClick={() => sendMessage(text, 'text')}
-                    className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-sm transition-colors"
+                    className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-sm transition-colors text-gray-800"
                   >
                     {text}
                   </button>
