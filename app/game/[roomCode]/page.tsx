@@ -9,6 +9,7 @@ import PaperSlip from '@/components/PaperSlip';
 import ShuffleAnimation from '@/components/ShuffleAnimation';
 import { onDisconnect } from '@firebase/database';
 import GameChat from '@/components/GameChat';
+import ConfettiEffect from '@/components/ConfettiEffect';
 
 export default function GamePage() {
     const params = useParams();
@@ -22,6 +23,7 @@ export default function GamePage() {
     const [selectedChor, setSelectedChor] = useState<string>('');
     const [selectedSipahi, setSelectedSipahi] = useState<string>('');
     const [showRajaSpeech, setShowRajaSpeech] = useState(true);
+    const [showConfetti, setShowConfetti] = useState(false);
     
     
     // Track if voice has been played for current round
@@ -161,6 +163,15 @@ export default function GamePage() {
             animationRound: 1
         });
     };
+
+    useEffect(() => {
+  if (gameState?.gamePhase === 'finished') {
+    setShowConfetti(true);
+    // Stop confetti after 5 seconds
+    const timer = setTimeout(() => setShowConfetti(false), 5000);
+    return () => clearTimeout(timer);
+  }
+}, [gameState?.gamePhase]);
 
     const handleShuffleComplete = async () => {
         if (!gameState) return;
@@ -382,8 +393,10 @@ if (!currentPlayer) {
 
 const chatMessages = gameState.chat || [];
 
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 p-4 md:p-8">
+            <ConfettiEffect show={showConfetti} />
             <div className="max-w-7xl mx-auto">
 
                 {/* Header */}
