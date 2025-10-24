@@ -8,6 +8,7 @@ import { shuffleRoles, calculatePoints } from '@/lib/gamelogic';
 import PaperSlip from '@/components/PaperSlip';
 import ShuffleAnimation from '@/components/ShuffleAnimation';
 import { onDisconnect } from '@firebase/database';
+import GameChat from '@/components/GameChat';
 
 export default function GamePage() {
     const params = useParams();
@@ -21,6 +22,7 @@ export default function GamePage() {
     const [selectedChor, setSelectedChor] = useState<string>('');
     const [selectedSipahi, setSelectedSipahi] = useState<string>('');
     const [showRajaSpeech, setShowRajaSpeech] = useState(true);
+    
     
     // Track if voice has been played for current round
     const hasPlayedVoiceRef = useRef(false);
@@ -377,6 +379,8 @@ if (!currentPlayer) {
  const winner = players.length > 0 
     ? players.reduce((max, player) => player.totalPoints > max.totalPoints ? player : max)
     : null;
+
+const chatMessages = gameState.chat || [];
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 p-4 md:p-8">
@@ -758,6 +762,14 @@ if (!currentPlayer) {
                     </div>
                 )}
             </div>
+            {gameState.gamePhase !== 'lobby' && currentPlayer && (
+            <GameChat
+                roomCode={roomCode}
+                playerId={playerId}
+                playerName={currentPlayer.name}
+                messages={chatMessages}
+            />
+        )}
         </div>
     );
 }

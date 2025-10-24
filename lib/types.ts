@@ -35,6 +35,7 @@ export interface GameState {
   createdBy: string;
   showShuffleAnimation?: boolean; // Add this
   animationRound?: number; // Add this
+  chat?: ChatMessage[];
 }
 
 
@@ -44,3 +45,12 @@ export const ROLES: Role[] = [
   { name: 'Chor', points: 0, color: '#DC143C' },
   { name: 'Sipahi', points: 200, color: '#228B22' }
 ];
+
+export interface ChatMessage {
+  id: string;
+  playerId: string;
+  playerName: string;
+  message: string;
+  timestamp: number;
+  type: 'emoji' | 'text';
+}
